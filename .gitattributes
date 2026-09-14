@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+*.bin      binary
+*.img      binary
+*.rom      binary
+*.hex      binary
+*.srec     binary
+*.elf      binary
+*.dump     binary
+*.fw       binary
+*.zip      binary
+*.tar.gz   binary

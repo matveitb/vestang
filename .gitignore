@@ -1,0 +1,25 @@
+# Результаты распаковки/анализа — не коммитим, воспроизводится из оригиналов
+firmware/extracted/*
+!firmware/extracted/.gitkeep
+
+# Временные файлы инструментов
+*.squashfs
+*.jffs2
+*.cramfs
+_*.extracted/
+*.bndb
+*.i64
+*.idb
+*.id0
+*.id1
+*.id2
+*.nam
+*.til
+ghidra_projects/
+*.rep
+*.rdb
+
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
