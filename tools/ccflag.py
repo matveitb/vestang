@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Флаги круиз-контроля и ограничителя скорости в прошивках M74.9.
+"""Включение круиз-контроля и ограничителя скорости в прошивках M74.9.
 
-Блок конфигурации круиза опознаётся по соседям в таблице калибровок:
+Проверено на парах тюнера (`+tun` против `+tun KK`): круиз включается
+ИСКЛЮЧИТЕЛЬНО калибровками, код не меняется ни на байт.
 
-    #n-5  = 03FF        (2 байта)
-    #n-4  = 0000 / 0001 признак поддержки круиза в софте
-    #n-3  = 00000046    (4 байта)
-    #n-2  = 40
-    #n-1  = 03
-    #n    = круиз-контроль      0 = выкл, 1 = вкл
-    #n+1  = ограничитель скорости
+    BB04: 3 байта — признак поддержки 0x63BE9, круиз 0x63BFA, ограничитель 0x63BFB
+    BB03: 2 байта — признак поддержки уже стоит, нужны 0x63BEA / 0x63BEB
 
-Адреса по софтам: BB03 -> 0x63BEA/0x63BEB, BB04 и BB02 -> 0x63BFA/0x63BFB.
+Блок опознаётся по соседям в таблице калибровок, без привязки к адресам:
 
-Правка калибровок ломает КС, поэтому по умолчанию исходная (заводская) КС
-восстанавливается компенсатором на 0x7FFF8 — так же, как делает тюнер.
+    #n-5 = 03FF   #n-4 = признак поддержки   #n-3 = 00000046
+    #n-2 = 40     #n-1 = 03                  #n = круиз   #n+1 = ограничитель
+
+КС калибровок по умолчанию пересчитывается честно. С ключом --pin вместо
+этого сохраняется исходная КС через компенсатор на 0x7FFF8 — так делает
+второй тюнер, чтобы прошивка отдавала заводскую КС.
 """
 import sys, struct
 from caltable import parse, runs
@@ -24,7 +24,7 @@ from kscomp import solve
 CAL_SEG = [(0x60000, 0x7FFFC)]
 
 def find(d):
-    """Вернуть (адрес_поддержки, адрес_круиза, адрес_ограничителя) или None."""
+    """(адрес признака поддержки, адрес круиза, адрес ограничителя) или None."""
     E = runs(parse(d))
     for i in range(5, len(E) - 1):
         p = [E[j][1] for j in range(i - 5, i + 2)]
@@ -41,29 +41,32 @@ def show(path):
         print(f'{path}: блок круиза не опознан'); return
     sup, cc, lim = got
     print(f'{path}')
-    supported = 'есть' if d[sup:sup+2] != bytes(2) else 'НЕТ'
-    print(f'   поддержка в софте @{sup:06X} = {d[sup:sup+2].hex().upper()}  ({supported})')
-    print(f'   круиз-контроль    @{cc:06X} = {d[cc]}')
-    print(f'   ограничитель      @{lim:06X} = {d[lim]}')
+    print(f'   поддержка    @{sup+1:06X} = {d[sup+1]}')
+    print(f'   круиз        @{cc:06X} = {d[cc]}')
+    print(f'   ограничитель @{lim:06X} = {d[lim]}')
 
-def set_cc(path, out, val):
+def set_cc(path, out, val, pin=False):
     d = bytearray(open(path, 'rb').read())
     got = find(bytes(d))
     if not got:
         sys.exit('блок круиза не опознан')
     sup, cc, lim = got
-    if val and d[sup:sup+2] == bytes(2):
-        print('ВНИМАНИЕ: софт помечен как без поддержки круиза (#n-4 = 0000).')
-        print('          На таком софте одного флага, скорее всего, мало.')
-    keep = crc32_m74(bytes(d), CAL_SEG)      # заводская КС до правки
-    d[cc] = d[lim] = 1 if val else 0
-    d[0x7FFF8:0x7FFFC] = solve(bytes(d), CAL_SEG, 0x7FFF8, keep)
-    open(out, 'wb').write(d)
-    print(f'{out}: круиз {"включён" if val else "выключен"}, КС калибровок сохранена {keep:08X}')
+    keep = crc32_m74(bytes(d), CAL_SEG)
+    v = 1 if val else 0
+    d[sup+1] = d[cc] = d[lim] = v
+    if pin:
+        d[0x7FFF8:0x7FFFC] = solve(bytes(d), CAL_SEG, 0x7FFF8, keep)
+        note = f'КС сохранена заводской {keep:08X}'
+    else:
+        struct.pack_into('<I', d, 0x7FFFC, crc32_m74(bytes(d), CAL_SEG))
+        note = f'КС пересчитана -> {struct.unpack_from("<I", d, 0x7FFFC)[0]:08X}'
+    open(out, 'wb').write(bytes(d))
+    print(f'{out}: круиз {"включён" if val else "выключен"}, {note}')
 
 if __name__ == '__main__':
-    cmd = sys.argv[1]
-    if cmd == 'show':
-        for p in sys.argv[2:]: show(p)
-    elif cmd in ('on', 'off'):
-        set_cc(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else sys.argv[2], cmd == 'on')
+    a = [x for x in sys.argv[1:] if x != '--pin']
+    pin = '--pin' in sys.argv
+    if a[0] == 'show':
+        for p in a[1:]: show(p)
+    elif a[0] in ('on', 'off'):
+        set_cc(a[1], a[2] if len(a) > 2 else a[1], a[0] == 'on', pin)
