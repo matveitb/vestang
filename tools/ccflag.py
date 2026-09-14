@@ -16,23 +16,26 @@
 этого сохраняется исходная КС через компенсатор на 0x7FFF8 — так делает
 второй тюнер, чтобы прошивка отдавала заводскую КС.
 """
-import sys, struct
-from caltable import parse, runs
+import sys, struct, re
 from m74ks import crc32_m74
 from kscomp import solve
 
 CAL_SEG = [(0x60000, 0x7FFFC)]
 
+# Байтовая сигнатура блока — не зависит от раскладки софта и от таблиц.
+# 1A 00 C8 00 C8 00 03 FF 00 <sup> FF FF 00 00 00 46
+# 40 00 C0 FF 40 00 C0 FF 03 00 <cc> <lim>
+SIG = re.compile(
+    rb'\x1A\x00\xC8\x00\xC8\x00\x03\xFF\x00(.)\xFF\xFF\x00\x00\x00\x46'
+    rb'\x40\x00\xC0\xFF\x40\x00\xC0\xFF\x03\x00(.)(.)', re.S)
+
 def find(d):
     """(адрес признака поддержки, адрес круиза, адрес ограничителя) или None."""
-    E = runs(parse(d))
-    for i in range(5, len(E) - 1):
-        p = [E[j][1] for j in range(i - 5, i + 2)]
-        if (d[p[0]:p[0]+2] == b'\x03\xFF'
-                and d[p[2]:p[2]+4] == b'\x00\x00\x00\x46'
-                and d[p[3]] == 0x40 and d[p[4]] == 0x03):
-            return p[1], p[5], p[6]
-    return None
+    m = SIG.search(d, 0x60000, 0x7FFFC)
+    if not m:
+        return None
+    base = m.start()
+    return base + 8, base + 26, base + 27
 
 def show(path):
     d = open(path, 'rb').read()
