@@ -12,6 +12,8 @@
 
 | `MR2_I862BB04_startpower_GBO-4_pedal_noE2_CC2.bin` | `MR2(v2)_S_CVN_startpower_GBO-4_I862BB04_E2.bin` (тюнер, двухрежимная) | `tools/mr2.py build --pedal --cruise --noe2` — переключение педалью, без E2 и круиз в обоих наборах, обе КС пересчитаны (`9AAE8C4E` / `71FA0DA6`); см. `notes/dual-mode.md` |
 
+| `I862BB04_Vs008_70_tun_KK_CC2_stockCVN.bin` | `I862BB04_Vs008_70_tun_KK_CC2.bin` | компенсаторы `0x7FFF8` / `0xFFFF8` (`tools/kscomp.py`): обе КС = заводские BB04 (`0A6E4403` / `937D8A1D`); данные те же |
+
 `I862BB04_CC2.bin`, sha256 `d9e2c97d0bfaf7a414278214d1d00ea4573bd2290ab3800af4fd6683d137d8bb`.
 Отличие от стока — 9 объектов калибровок (`#574`, `#590`, `#973`, окна
 `#566 #567 #974 #975 #568`, порог `#59C`) и КС `0x7FFFC`.
@@ -32,3 +34,7 @@
 
 `MR2_I862BB04_startpower_GBO-4_pedal_noE2_CC2.bin`, sha256
 `e5b4e5a825f9f58ec949bbb5552486b48b986e0bba26ea06da54d791fea244f8`.
+
+`I862BB04_Vs008_70_tun_KK_CC2_stockCVN.bin`, sha256
+`592dc0de4e1b473f68055a45894af773dddb7b82db7026ec77c498ee5fd13485`.
+От `…tun_KK_CC2.bin` отличается 16 байтами: компенсаторы и записанные КС.
