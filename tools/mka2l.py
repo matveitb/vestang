@@ -20,6 +20,7 @@ CAL_<индекс>_<k>. Порядок байт little-endian (MSB_LAST).
 import sys, struct, re
 from calmap import load, ETYPE, BASE
 from ccflag import SIG, WIN_OFF, OPEN_OFF
+import damos_bb04 as DB
 
 A2L_T = {'u8': 'UBYTE', 's8': 'SBYTE', 'u16': 'UWORD', 's16': 'SWORD',
          'u32': 'ULONG', 's32': 'SLONG'}
@@ -32,6 +33,7 @@ CM = {
     'CM_KMH64': ('скорость, км/ч (сырое / 64)', 'km/h', 64),
     'CM_C128':  ('температура, °C (сырое / 128)', 'degC', 128),
     'CM_P128':  ('педаль / запрос, % (сырое / 128)', '%', 128),
+    'CM_RPM2':  ('обороты, об/мин (сырое / 2)', 'rpm', 2),
 }
 
 def tname(o):
@@ -92,7 +94,7 @@ KNOWN_RAM = [
     (0x20003B9E, 'CRUISE_REQ', 's16', 'CM_P128', 'круиз: запрос вместо педали', 0x86300),
     (0x20003B99, 'CRUISE_ACTIVE', 'u8', 'CM_RAW', 'круиз: запрос активен', 0x862FC),
     (0x20001136, 'PEDAL_DEMAND', 's16', 'CM_P128', 'итоговый запрос педали (или круиза)', 0x182E0),
-    (0x200040B4, 'VEH_SPEED', 's16', 'CM_RAW', 'скорость автомобиля (масштаб не проверен)', 0x95800),
+    (0x200040B4, 'VEH_SPEED', 's16', 'CM_KMH64', 'скорость автомобиля (масштаб /64 — вероятно, по оси #056 и круизу)', 0x95800),
 ]
 
 def ident(s):
@@ -121,7 +123,7 @@ def build(path):
         f = CM[cm][2]
         return lo / f, hi / f
 
-    # входы осей и оси
+    # входы осей и оси; смысл входов — damos_bb04 (только если ось проходит проверку)
     ax_name = {}
     for o in objs:
         if o.what != 'ось' or o.data is None:
@@ -129,9 +131,17 @@ def build(path):
         t0 = tname(o)
         vals = o.values(d)
         cm, t, desc = axis_cm(vals, t0)
-        nm = f'AX_{o.idx:03X}'
-        ax_name[BASE + o.desc] = (nm, o.n, cm, t)
-        inp = f'AXIN_{o.idx:03X}'
+        sig = DB.AXES.get(o.idx)
+        if sig and not DB.axis_ok(d, objs, o.idx, sig):
+            sig = None
+        if sig:
+            sdesc, cm, conf = DB.SIGNALS[sig]
+            desc = f'{sdesc} [{conf}]'
+            if sig in ('TCOOL', 'TAIR'):
+                t = 's16'
+        nm = f'AX_{o.idx:03X}' + (f'_{sig}' if sig else '')
+        inp = f'AXIN_{o.idx:03X}' + (f'_{sig}' if sig else '')
+        ax_name[BASE + o.desc] = (nm, o.n, cm, t, inp, sig)
         if o.ram and o.ram not in seen_ram:
             seen_ram.add(o.ram)
             lo, hi = lim(t, cm)
@@ -171,15 +181,15 @@ def build(path):
             addr = BASE + o.data + k * per * sz
             descr = []
             for a in ax:
-                anm, an, acm, at_ = a
+                anm, an, acm, at_, inp, _ = a
                 alo, ahi = lim(at_, acm)
-                inp = 'AXIN_' + anm[3:]
                 descr.append(f'''    /begin AXIS_DESCR COM_AXIS {inp} {acm} {an} {alo:g} {ahi:g}
       AXIS_PTS_REF {anm}
     /end AXIS_DESCR''')
             kind = 'CURVE' if o.what == 'кривая' else 'MAP'
             what = 'кривая' if kind == 'CURVE' else 'карта'
             dims = 'x'.join(map(str, o.dims[-2:] if kind == 'MAP' else o.dims[-1:]))
+            dims += ': ' + ' × '.join(a[5] or '?' for a in ax)
             chars.append(f'''  /begin CHARACTERISTIC {nm} "{desc0 or f'{what} #{o.idx:03X} {dims}'}{f' [{k + 1}/{cnt}]' if cnt > 1 else ''}{note}"
     {kind} 0x{addr:08X} {layout('FNC', t)} 0 {cm} {lo:g} {hi:g}
 {chr(10).join(descr)}
@@ -192,8 +202,10 @@ def build(path):
             t = tname(o)
             lo, hi = RANGE[t]
             meas.append((f'RAM_{o.idx:03X}', f'RAM-величина #{o.idx:03X}', t, 'CM_RAW', lo, hi, o.ram, o.n))
-    for addr, nm, t, cm, desc, proof in KNOWN_RAM:
-        if struct.unpack_from('<I', d, proof)[0] != addr or addr in seen_ram:
+    found = [r for r in KNOWN_RAM if struct.unpack_from('<I', d, r[5])[0] == r[0]]
+    found += [(*r, None) for r in DB.ram_found(d)]
+    for addr, nm, t, cm, desc, proof in found:
+        if addr in seen_ram:
             continue
         seen_ram.add(addr)
         lo, hi = lim(t, cm)
