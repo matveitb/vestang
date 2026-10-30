@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Контрольные суммы прошивок Bosch M74.9 (Artery AT32F4xx).
+"""Контрольные суммы прошивок ИТЭЛМА M74.9 (Artery AT32F4xx).
 
 Алгоритм: CRC-32, полином 0x04C11DB7, MSB-first (без рефлексии),
 init 0xFFFFFFFF, без финального XOR. Результат хранится little-endian.

@@ -10,6 +10,8 @@
 
 | `I862BB04_startpower_CC2.bin` | `S_CVN____startpower  2023__I862BB04_.bin` (тюнер, код = сток BB04) | `tools/ccflag.py on` — флаги круиза, окна кнопок и порог обрыва, КС калибровок пересчитана честно (`5EDDE3C0`) |
 
+| `MR2_I862BB04_startpower_GBO-4_pedal_noE2_CC2.bin` | `MR2(v2)_S_CVN_startpower_GBO-4_I862BB04_E2.bin` (тюнер, двухрежимная) | `tools/mr2.py build --pedal --cruise --noe2` — переключение педалью, без E2 и круиз в обоих наборах, обе КС пересчитаны (`9AAE8C4E` / `71FA0DA6`); см. `notes/dual-mode.md` |
+
 `I862BB04_CC2.bin`, sha256 `d9e2c97d0bfaf7a414278214d1d00ea4573bd2290ab3800af4fd6683d137d8bb`.
 Отличие от стока — 9 объектов калибровок (`#574`, `#590`, `#973`, окна
 `#566 #567 #974 #975 #568`, порог `#59C`) и КС `0x7FFFC`.
@@ -27,3 +29,6 @@
 Прежний `I862BB04_CC.bin` (только три флага, sha256 `2d73e470…`) удалён:
 в машине круиз на нём не включился — у BB04 схлопнуты окна кнопок
 (`notes/cruise.md`, «Кнопки: почему на BB04 не работает»).
+
+`MR2_I862BB04_startpower_GBO-4_pedal_noE2_CC2.bin`, sha256
+`e5b4e5a825f9f58ec949bbb5552486b48b986e0bba26ea06da54d791fea244f8`.
